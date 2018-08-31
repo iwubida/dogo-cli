@@ -1,0 +1,159 @@
+#!/usr/bin/env node
+
+const path = require('path');
+const download = require('download-git-repo');
+const program = require('commander');
+const chalk = require('chalk');
+const ora = require('ora'); 
+const home = require('user-home');
+const inquirer = require('inquirer');
+const Metalsmith = require('metalsmith');
+const rm = require('rimraf').sync;
+
+const options={
+  gitHTTP:  'http://git.chongkouwei.com:wubida/fe-template',
+  gitSSH: 'gitlab:git.chongkouwei.com:wubida/fe-template'
+}
+
+program
+  .version('1.0.1')
+  .description('物必达科技项目构建系统 -- Dogo')
+  .usage('<project-name>')
+  .on('--help', () => {
+    console.log()
+    console.log()
+    console.log('  Example:')
+    console.log()
+    console.log(chalk.yellow('    # 创建一个新项目：'))
+    console.log('    $ dogo init <my-project>')
+    console.log()
+    console.log(chalk.yellow('    # 使用SSH的方式创建新项目：'))
+    console.log('    $ dogo init -s <my-project>')
+    console.log('    $ dogo init --ssh <my-project>')
+    console.log()
+  });
+
+program
+  .command('init')
+  .description('创建新的项目')
+  .option("-s, --ssh <name>", "使用SSH的方式下载模版")
+  .action(function(env, options) {
+    if(options || env.ssh){
+      startCli();
+    }else{
+      return program.help();
+    }
+  });
+
+program
+  .command('*')
+  .action(function(env){
+    return program.help();
+  });
+
+// 解析命令行
+program.parse(process.argv);
+// 没有任何输入 提示help
+if(program.args.length < 1){
+  return program.help();
+}
+
+/**
+ * 命令敲对就开始
+ */
+function startCli(){
+  inquirer.prompt([
+    {
+      type: 'list',
+      name: 'projectType',
+      message: '请选择要开发的项目框架：',
+      choices: [
+        {
+          name: 'Vue',
+          value: 'vue'
+        },
+        {
+          name: 'React',
+          value: 'react'
+        },
+        {
+          name: 'React-Native',
+          value: 'react-naitve'
+        }
+      ]
+    }
+  ]).then(function(answers){
+    downloadTpl(answers);
+  });
+}
+
+/**
+ * 下载模版
+ * @param promptVal 用户选择的答案
+ */
+function downloadTpl(promptVal) {
+  const ssh = program.args[program.args.length-1].ssh;
+  const rawName = ssh ? ssh : program.args[0];
+  const gitUrl =  ssh ? options.gitSSH : options.gitHTTP;
+  const tmp = path.join(home, rawName);
+  const to = path.resolve(rawName || '.');
+  const spinner = ora('模板下载中...');
+  spinner.start();
+
+  download(gitUrl, tmp, { clone:true }, function (err) {
+    spinner.stop();
+    generate(promptVal, tmp, to, function(){
+      if(err){
+        console.log(chalk.red(`项目创建失败: ${err}`));
+        process.exit();
+      }else{
+        console.log(chalk.cyan('##########  物必达科技  ##########'));
+        console.log(chalk.cyan('##                              ##'));
+        console.log(chalk.cyan('##                              ##'));
+        console.log(chalk.cyan('##       项目快速构建系统       ##'));
+        console.log(chalk.cyan('##          dogo 稳！           ##'));
+        console.log(chalk.cyan('##                              ##'));
+        console.log(chalk.cyan('##            ___               ##'));
+        console.log(chalk.cyan('##      |     | |               ##'));
+        console.log(chalk.cyan('##     / \\    | |               ##'));
+        console.log(chalk.cyan('##    |--o|===|-|               ##'));
+        console.log(chalk.cyan('##    |--o|===|-|               ##'));
+        console.log(chalk.cyan('##    |---|   | |               ##'));
+        console.log(chalk.cyan('##   /     \\  |D|               ##'));
+        console.log(chalk.cyan('##  | W     | |O|               ##'));
+        console.log(chalk.cyan('##  | B     |=|G|               ##'));
+        console.log(chalk.cyan('##  | D     | |O|               ##'));
+        console.log(chalk.cyan('##  |_______| |_|               ##'));
+        console.log(chalk.cyan('##   |@| |@|  | |               ##'));
+        console.log(chalk.cyan('##____________|_|_              ##'));
+        console.log(chalk.cyan('##                              ##'));
+        console.log(chalk.cyan('##################################'));
+        console.log(chalk.green('项目创建完成'));
+        console.log(chalk.magenta('苦逼赶紧撸码吧!'));
+      }
+    });
+  });
+}
+
+/**
+ * 处理模版
+ * @param promptVal 用户选择的答案
+ * @param src 暂存地址
+ * @param dest 存储地址
+ * @param doneCallback 模版处理结束后的回调
+ */
+function generate(promptVal, src, dest, doneCallback){
+  let projectName = promptVal.projectType;
+  if(projectName === 'react' || projectName === 'react-native'){
+    console.log(chalk.green('项目模板还没写完，敬请期待!'));
+    return ;
+  }
+  const metalsmith = Metalsmith(path.join(src, projectName));
+  metalsmith
+    .source('.')
+    .destination(dest)
+    .build((err, files) => {
+      rm(src);
+      doneCallback(err);
+    })
+}
